@@ -1,0 +1,70 @@
+{
+  "hardware": "CUDA (CuPy)",
+  "precision": "float64",
+  "benchmarks": [
+    {
+      "N": 150,
+      "timings_ms": {
+        "CPU Direct": 0.675,
+        "GPU Direct": 0.255,
+        "GPU Tiled": 0.319,
+        "Barnes-Hut (theta=0.5)": 160.709
+      },
+      "speedups": {
+        "GPU Direct": 2.64,
+        "GPU Tiled": 2.11
+      },
+      "relative_force_errors": {
+        "Barnes-Hut": "0.011%"
+      }
+    },
+    {
+      "N": 500,
+      "timings_ms": {
+        "CPU Direct": 22.607,
+        "GPU Direct": 0.335,
+        "GPU Tiled": 0.901,
+        "Barnes-Hut (theta=0.5)": 977.999
+      },
+      "speedups": {
+        "GPU Direct": 67.52,
+        "GPU Tiled": 25.1
+      },
+      "relative_force_errors": {
+        "Barnes-Hut": "0.016%"
+      }
+    },
+    {
+      "N": 1000,
+      "timings_ms": {
+        "CPU Direct": 114.18,
+        "GPU Direct": 1.178,
+        "GPU Tiled": 1.63,
+        "Barnes-Hut (theta=0.5)": 2051.9
+      },
+      "speedups": {
+        "GPU Direct": 96.91,
+        "GPU Tiled": 70.04
+      },
+      "relative_force_errors": {
+        "Barnes-Hut": "0.016%"
+      }
+    },
+    {
+      "N": 2048,
+      "timings_ms": {
+        "CPU Direct": 241.614,
+        "GPU Direct": 7.118,
+        "GPU Tiled": 2.332,
+        "Barnes-Hut (theta=0.5)": 4508.395
+      },
+      "speedups": {
+        "GPU Direct": 33.94,
+        "GPU Tiled": 103.61
+      },
+      "relative_force_errors": {
+        "Barnes-Hut": "0.018%"
+      }
+    }
+  ]
+}

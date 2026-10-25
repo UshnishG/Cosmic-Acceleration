@@ -1,0 +1,17 @@
+# Cosmic Acceleration: A CUDA-Powered N-Body Simulation
+# Hardware Requirements: NVIDIA GPU with CUDA Compute Capability >= 7.0 (sm_70 to sm_90)
+# Developed and benchmarked on NVIDIA GeForce RTX 4060 Laptop GPU (Ada Lovelace sm_89)
+
+# Core Scientific Computing
+numpy>=1.24.0,<2.6.0
+scipy>=1.10.0
+
+# GPU CUDA Acceleration (Native CuPy with NVRTC runtime kernel compilation)
+cupy-cuda12x>=13.0.0
+
+# Optional PyTorch CUDA Tensor Backend
+torch>=2.0.0
+
+# Visualization & Animation
+matplotlib>=3.7.0
+pillow>=9.5.0
