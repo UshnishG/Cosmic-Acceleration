@@ -181,6 +181,18 @@ Spiraling helical orbits where the vertical axis represents Time ($Z = \text{Tim
 ### 3. 2D Fading Trails Animation (`2d_fading_trails.gif`)
 Animated top-down orbital motion showing trailing particle paths fading over time under adaptive time-stepping.
 
+### 4. Cinematic Simulation Demo Video (`output/demo_video.mp4`)
+A full high-definition video walkthrough demonstrating:
+1. **Title & Architecture**: Project motivation, hardware specs, and algorithmic workflow.
+2. **Real-Time 3D Dynamics**: 360-degree orbiting camera sweeping around the 150-body celestial disk.
+3. **2D Fading Trails**: Concentric orbital motion with live adaptive timestepping HUD.
+4. **Performance Breakdown**: Benchmark speedup cards and physics validation checklists.
+
+To regenerate the demo video locally:
+```bash
+python src/demo_video_generator.py
+```
+
 ---
 
 ## Installation & Quickstart
