@@ -5,14 +5,14 @@
     {
       "N": 150,
       "timings_ms": {
-        "CPU Direct": 0.675,
-        "GPU Direct": 0.255,
-        "GPU Tiled": 0.319,
-        "Barnes-Hut (theta=0.5)": 160.709
+        "CPU Direct": 0.574,
+        "GPU Direct": 0.233,
+        "GPU Tiled": 0.242,
+        "Barnes-Hut (theta=0.5)": 92.122
       },
       "speedups": {
-        "GPU Direct": 2.64,
-        "GPU Tiled": 2.11
+        "GPU Direct": 2.46,
+        "GPU Tiled": 2.37
       },
       "relative_force_errors": {
         "Barnes-Hut": "0.011%"
@@ -21,14 +21,14 @@
     {
       "N": 500,
       "timings_ms": {
-        "CPU Direct": 22.607,
-        "GPU Direct": 0.335,
-        "GPU Tiled": 0.901,
-        "Barnes-Hut (theta=0.5)": 977.999
+        "CPU Direct": 18.051,
+        "GPU Direct": 0.325,
+        "GPU Tiled": 0.9,
+        "Barnes-Hut (theta=0.5)": 549.555
       },
       "speedups": {
-        "GPU Direct": 67.52,
-        "GPU Tiled": 25.1
+        "GPU Direct": 55.49,
+        "GPU Tiled": 20.05
       },
       "relative_force_errors": {
         "Barnes-Hut": "0.016%"
@@ -37,14 +37,14 @@
     {
       "N": 1000,
       "timings_ms": {
-        "CPU Direct": 114.18,
-        "GPU Direct": 1.178,
-        "GPU Tiled": 1.63,
-        "Barnes-Hut (theta=0.5)": 2051.9
+        "CPU Direct": 59.044,
+        "GPU Direct": 5.805,
+        "GPU Tiled": 4.437,
+        "Barnes-Hut (theta=0.5)": 1507.514
       },
       "speedups": {
-        "GPU Direct": 96.91,
-        "GPU Tiled": 70.04
+        "GPU Direct": 10.17,
+        "GPU Tiled": 13.31
       },
       "relative_force_errors": {
         "Barnes-Hut": "0.016%"
@@ -53,14 +53,14 @@
     {
       "N": 2048,
       "timings_ms": {
-        "CPU Direct": 241.614,
-        "GPU Direct": 7.118,
-        "GPU Tiled": 2.332,
-        "Barnes-Hut (theta=0.5)": 4508.395
+        "CPU Direct": 230.368,
+        "GPU Direct": 7.949,
+        "GPU Tiled": 3.309,
+        "Barnes-Hut (theta=0.5)": 3127.906
       },
       "speedups": {
-        "GPU Direct": 33.94,
-        "GPU Tiled": 103.61
+        "GPU Direct": 28.98,
+        "GPU Tiled": 69.61
       },
       "relative_force_errors": {
         "Barnes-Hut": "0.018%"
