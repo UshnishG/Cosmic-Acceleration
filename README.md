@@ -215,7 +215,39 @@ python -c "import cupy as cp; print('GPU Device:', cp.cuda.runtime.getDeviceProp
 
 ---
 
-## Running Tests & Benchmarks
+## Running Interactive Live Simulations
+
+For live presentations and faculty defenses, you can launch real-time simulation windows directly on your screen with live HUD telemetry and keyboard controls:
+
+### 1. Interactive 3D Simulation (Mouse Rotation & Live Telemetry)
+```bash
+python main.py --mode live
+# or
+python src/live_simulation.py --gui 3d
+```
+- **Controls**:
+  - `[Mouse Drag]`: Rotate camera in 3D space in real time.
+  - `[Scroll]`: Zoom in and out.
+  - `[Space]`: Pause / Resume simulation.
+  - `[C]`: **Hot-swap compute solver live** (`GPU Tiled` $\to$ `GPU Direct` $\to$ `CPU NumPy` $\to$ `Barnes-Hut`) to demonstrate live FPS difference to faculty!
+  - `[R]`: Reset initial conditions to $t = 0$.
+  - `[A]`: Toggle Adaptive Time-stepping on/off.
+  - `[T]`: Toggle orbit trails.
+  - `[V]`: Toggle cinematic auto-camera rotation.
+  - `[+] / [-]`: Increase / decrease simulation speed (physics substeps per frame).
+  - `[Q] / [Esc]`: Exit.
+
+### 2. High-Performance 60+ FPS Glowing Galaxy (OpenCV)
+```bash
+python main.py --mode live-2d
+# or
+python src/live_simulation.py --gui fast
+```
+Blazing-fast hardware-accelerated canvas with exponential alpha-decay fading trails, multi-layer radial star glow, and real-time telemetry banner.
+
+---
+
+## Running Offline Simulations & Benchmarks
 
 ### Run the Simulation and Generate All Visualizations
 ```bash
