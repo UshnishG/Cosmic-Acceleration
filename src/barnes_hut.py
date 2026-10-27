@@ -180,3 +180,12 @@ class BarnesHutSolver:
         self.time += dt
         self.step_count += 1
         return dt
+
+    def get_state(self):
+        """Retrieve current pos, vel, acc, mass as NumPy arrays."""
+        return (
+            self.pos.copy(),
+            self.vel.copy(),
+            self.acc.copy(),
+            self.mass.copy()
+        )

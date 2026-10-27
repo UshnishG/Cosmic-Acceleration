@@ -84,9 +84,13 @@ def run_2d_simulation(config: SimulationConfig, steps: int = 500, output_dir: st
 
 def main():
     parser = argparse.ArgumentParser(description="Cosmic Acceleration: A CUDA-Powered N-Body Simulation")
-    parser.add_argument("--mode", choices=["3d", "2d", "all", "benchmark", "test"], default="all",
-                        help="Execution mode (default: all)")
+    parser.add_argument("--mode", choices=["3d", "2d", "all", "benchmark", "test", "live", "live-3d", "live-2d"], default="all",
+                        help="Execution mode (default: all). Use 'live' or 'live-3d' for interactive 3D GUI, 'live-2d' for 60FPS OpenCV.")
+    parser.add_argument("--solver", choices=["gpu_tiled", "gpu_direct", "cpu", "barnes_hut"], default="gpu_tiled",
+                        help="Compute engine for live mode (default: gpu_tiled)")
     parser.add_argument("--steps", type=int, default=1000, help="Number of integration steps")
+    parser.add_argument("--adaptive", action="store_true", help="Enable adaptive time-stepping in live mode")
+    parser.add_argument("--substeps", type=int, default=1, help="Physics steps per render frame in live mode")
     parser.add_argument("--outdir", type=str, default="output", help="Directory for output plots")
     args = parser.parse_args()
     
@@ -100,6 +104,26 @@ def main():
         from benchmarks.plot_benchmarks import generate_benchmark_charts
         benchmark_solvers()
         generate_benchmark_charts()
+    elif args.mode in ["live", "live-3d"]:
+        from src.live_simulation import LiveSimulationEngine, run_live_3d
+        engine = LiveSimulationEngine(
+            config=config,
+            solver_name=args.solver,
+            is_3d=True,
+            adaptive=args.adaptive
+        )
+        engine.substeps = args.substeps
+        run_live_3d(engine)
+    elif args.mode == "live-2d":
+        from src.live_simulation import LiveSimulationEngine, run_live_opencv
+        engine = LiveSimulationEngine(
+            config=config,
+            solver_name=args.solver,
+            is_3d=False,
+            adaptive=args.adaptive
+        )
+        engine.substeps = args.substeps
+        run_live_opencv(engine)
     elif args.mode == "3d":
         run_3d_simulation(config, steps=args.steps, output_dir=args.outdir)
     elif args.mode == "2d":
