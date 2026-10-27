@@ -1,0 +1,66 @@
+flowchart TD
+    subgraph HOST["Host Subsystem (CPU / Python 3.11)"]
+        IC["Initial Conditions Generator<br>• 1 Heavy Center (M = 1.2)<br>• 149 Orbiters (m = 10⁻⁵)<br>• Inclined Keplerian Disk (i ∈ ±0.05 rad)<br>• COM Momentum Balance (||P|| < 10⁻¹⁴)"]
+        CFG["Simulation Constants<br>• G = 1.0, Plummer ε = 0.02<br>• Adaptive η = 0.05, Δt_fixed = 0.005"]
+        ORCH["Simulation Orchestrator & CLI<br>• Mode Dispatch: 3D / 2D / Benchmark<br>• Memory Preallocation & Stream Sync"]
+    end
+
+    subgraph PCIE["PCIe Gen 4.0 x8 Bus (16 GB/s)"]
+        H2D["cudaMemcpyHostToDevice<br>Positions (N, 3), Velocities (N, 3), Masses (N)"]
+        D2H["cudaMemcpyDeviceToHost<br>Trajectory Snapshots & Energetics"]
+    end
+
+    subgraph GPU["GPU Hardware & Memory Hierarchy (RTX 4060 sm_89)"]
+        GMEM["VRAM Global Memory (8 GB GDDR6)<br>Linear Arrays: pos_d, vel_d, acc_d, mass_d"]
+        
+        subgraph SM["24 Streaming Multiprocessors (SMs)"]
+            SMEM["Shared Memory / L1 Cache (128 KB / SM)<br>Tiled Coordinate Cache: tile_pos[256][3]"]
+            REGS["32-bit Register File<br>Thread-private acceleration accumulators"]
+            WARP["Warp Schedulers & FP32 ALUs<br>Coalesced 32-thread SIMT execution"]
+        end
+    end
+
+    subgraph SOLVERS["Acceleration Force Compute Engines"]
+        S1["CPU Vectorized Direct (NumPy)<br>O(N²) Baseline Reference<br>Zero-diagonal self-interaction mask"]
+        S2["GPU Direct CUDA (CuPy RawKernel)<br>O(N²) Parallel Grid<br>1 thread per body, coalesced global reads"]
+        S3["GPU Tiled Shared Memory (CUDA)<br>O(N²/B) Bandwidth Optimized<br>Block size B=256, __syncthreads() barrier"]
+        S4["Hierarchical Barnes-Hut (Octree)<br>O(N log N) Treecode<br>Multipole Acceptance Criterion (θ=0.5)"]
+        S5["Monte Carlo Control Variates (MC-CV)<br>Stochastic O(N·M) Estimator<br>Madan et al. (SIGGRAPH 2025)<br>VRF = 3.14 × 10¹¹×"]
+    end
+
+    subgraph INTEGRATION["Symplectic Physics & Time-Stepping Engine"]
+        VV["2nd-Order Velocity Verlet (Symplectic)<br>1. x(t + Δt) = x(t) + v(t)Δt + 0.5 a(t)Δt²<br>2. Compute a(t + Δt) via selected solver<br>3. v(t + Δt) = v(t) + 0.5 [a(t) + a(t+Δt)] Δt"]
+        ADAPT["Adaptive Timestep Criterion<br>Δt = η √(ε / max ||a_i||)"]
+        DIAG["Conservation Diagnostics<br>• Energy Drift: |ΔE / E₀| < 0.003%<br>• Linear Momentum: ||P_tot|| < 10⁻¹⁴"]
+    end
+
+    subgraph OUTPUT["Output & Telemetry Pipeline"]
+        V3D["3D Physical & Space-Time Orbits<br>Interactive Matplotlib Plasma Render"]
+        V2D["2D Fading Trails Animation<br>Alpha-decay trajectory GIF"]
+        VID["Cinematic HD Video Demo<br>1280x720 @ 24 fps H.264 transcode"]
+        BENCH["Automated Benchmark Suite<br>Speedup & Scaling Curves vs N"]
+    end
+
+    %% Data flow connections
+    HOST --> H2D
+    H2D --> GMEM
+    GMEM --> SMEM
+    SMEM --> REGS
+    REGS --> WARP
+
+    WARP --> S2
+    WARP --> S3
+    HOST --> S1
+    HOST --> S4
+    HOST --> S5
+
+    S1 --> VV
+    S2 --> VV
+    S3 --> VV
+    S4 --> VV
+    S5 --> VV
+
+    VV --> ADAPT
+    ADAPT --> DIAG
+    DIAG --> D2H
+    D2H --> OUTPUT
