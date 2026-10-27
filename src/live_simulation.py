@@ -342,14 +342,294 @@ def run_live_3d(engine: LiveSimulationEngine, trail_len: int = 40):
 
 
 # =============================================================================
-# GUI 2: HIGH-FPS OPENCV GLOWING CANVAS (2D / 3D Projection)
+# GUI 2: HIGH-PERFORMANCE 3D PERSPECTIVE OPEN-CV RENDERER (60-120 FPS)
+# =============================================================================
+def run_live_3d_opencv(engine: LiveSimulationEngine):
+    """
+    True 3D hardware-accelerated perspective renderer with interactive mouse orbit,
+    depth-sorted particles, 3D rotating orbital trails, glowing celestial star,
+    celestial reference grid, and real-time HUD telemetry at 60-120 FPS.
+    """
+    import cv2
+    import matplotlib.cm as cm
+
+    width, height = 1024, 1024
+    cx, cy = width // 2, height // 2
+    fov = 850.0
+
+    # Camera state
+    camera = {
+        "yaw": 0.65,          # Horizontal azimuth angle (rad)
+        "pitch": 0.44,        # Vertical elevation angle (rad)
+        "distance": 2.70,     # Distance from center of mass
+        "auto_rotate": True,  # Smooth cinematic 360 rotation
+        "show_trails": True,
+        "show_grid": True,
+        "mouse_down": False,
+        "last_x": 0,
+        "last_y": 0
+    }
+
+    # Plasma colors in BGR
+    N = engine.N
+    plasma_cmap = cm.plasma(np.linspace(0.15, 0.95, N - 1))
+    colors_bgr = []
+    for rgba in plasma_cmap:
+        b = int(rgba[2] * 255)
+        g = int(rgba[1] * 255)
+        r = int(rgba[0] * 255)
+        colors_bgr.append((b, g, r))
+
+    # Pre-generate 3D reference grid rings at Z=0 (radii 0.4, 0.8, 1.2)
+    grid_circles_3d = []
+    num_pts_ring = 80
+    theta_ring = np.linspace(0, 2 * np.pi, num_pts_ring, endpoint=True)
+    for r_val in [0.4, 0.8, 1.2]:
+        ring_pts = np.zeros((num_pts_ring, 3), dtype=np.float64)
+        ring_pts[:, 0] = r_val * np.cos(theta_ring)
+        ring_pts[:, 1] = r_val * np.sin(theta_ring)
+        ring_pts[:, 2] = 0.0
+        grid_circles_3d.append(ring_pts)
+
+    # 3D coordinate axes at origin
+    axis_x = np.array([[0.0, 0.0, 0.0], [0.35, 0.0, 0.0]])
+    axis_y = np.array([[0.0, 0.0, 0.0], [0.0, 0.35, 0.0]])
+    axis_z = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.20]])
+
+    # 3D Trails ring buffer: list of (N, 3) arrays
+    trail_max_len = 45
+    trails_3d = [engine.pos.copy()]
+
+    window_name = "Cosmic Acceleration: 3D Real-Time CUDA Simulation"
+    cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+
+    def mouse_handler(event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            camera["mouse_down"] = True
+            camera["last_x"] = x
+            camera["last_y"] = y
+            camera["auto_rotate"] = False  # User interaction stops auto-spin
+        elif event == cv2.EVENT_LBUTTONUP:
+            camera["mouse_down"] = False
+        elif event == cv2.EVENT_MOUSEMOVE and camera["mouse_down"]:
+            dx = x - camera["last_x"]
+            dy = y - camera["last_y"]
+            camera["yaw"] += dx * 0.006
+            camera["pitch"] = np.clip(camera["pitch"] + dy * 0.006, -np.pi / 2.1, np.pi / 2.1)
+            camera["last_x"] = x
+            camera["last_y"] = y
+        elif event == cv2.EVENT_MOUSEWHEEL:
+            # flags > 0 is scroll up, flags < 0 is scroll down
+            if flags > 0:
+                camera["distance"] = max(1.0, camera["distance"] - 0.15)
+            else:
+                camera["distance"] = min(8.0, camera["distance"] + 0.15)
+
+    cv2.setMouseCallback(window_name, mouse_handler)
+
+    print("\n=======================================================")
+    print("3D REAL-TIME PERSPECTIVE SIMULATION RUNNING (60-120 FPS)")
+    print("Controls:")
+    print("  [Mouse Drag / Arrows] : Rotate camera in 3D (Pitch & Yaw)")
+    print("  [Mouse Scroll / W, S] : Zoom In / Out")
+    print("  [Space]               : Pause / Resume")
+    print("  [C]                   : Hot-Swap Solver (GPU Tiled -> Direct -> CPU -> Barnes-Hut)")
+    print("  [V]                   : Toggle 3D Cinematic Auto-Orbit")
+    print("  [T]                   : Toggle 3D Orbital Trails")
+    print("  [G]                   : Toggle Reference Grid")
+    print("  [R]                   : Reset to t = 0")
+    print("  [A]                   : Toggle Adaptive Δt")
+    print("  [+] / [-]             : Speed Up / Slow Down")
+    print("  [Q] / Esc             : Quit")
+    print("=======================================================\n")
+
+    def project_points(pts: np.ndarray):
+        """Vectorized 3D perspective projection."""
+        cyaw, syaw = np.cos(camera["yaw"]), np.sin(camera["yaw"])
+        cpitch, spitch = np.cos(camera["pitch"]), np.sin(camera["pitch"])
+
+        # 1. Rotate by yaw around world Y-axis
+        x1 = pts[:, 0] * cyaw + pts[:, 2] * syaw
+        y1 = pts[:, 1]
+        z1 = -pts[:, 0] * syaw + pts[:, 2] * cyaw
+
+        # 2. Rotate by pitch around local X-axis
+        x2 = x1
+        y2 = y1 * cpitch - z1 * spitch
+        z2 = y1 * spitch + z1 * cpitch
+
+        # 3. Translate along camera Z
+        zc = z2 + camera["distance"]
+        inv_zc = 1.0 / np.maximum(zc, 0.08)
+
+        sx = (cx + fov * x2 * inv_zc).astype(int)
+        sy = (cy - fov * y2 * inv_zc).astype(int)
+        valid = zc > 0.10
+        return sx, sy, zc, valid
+
+    while True:
+        engine.step_simulation()
+
+        # Cinematic auto-rotation
+        if camera["auto_rotate"] and not engine.paused:
+            camera["yaw"] = (camera["yaw"] + 0.005) % (2 * np.pi)
+
+        # Update 3D trail buffer
+        if not engine.paused:
+            trails_3d.append(engine.pos.copy())
+            if len(trails_3d) > trail_max_len:
+                trails_3d.pop(0)
+
+        # Black space canvas
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+
+        # 1. Draw 3D Reference Grid & Coordinate triad on Z=0 plane
+        if camera["show_grid"]:
+            # Concentric rings
+            for ring in grid_circles_3d:
+                rsx, rsy, _, rval = project_points(ring)
+                for pt_idx in range(len(ring) - 1):
+                    if rval[pt_idx] and rval[pt_idx + 1]:
+                        cv2.line(frame, (rsx[pt_idx], rsy[pt_idx]), (rsx[pt_idx + 1], rsy[pt_idx + 1]),
+                                 (35, 45, 60), 1, lineType=cv2.LINE_AA)
+
+            # Axis arrows (X: Red, Y: Green, Z: Blue)
+            for ax_pts, col in [(axis_x, (60, 60, 200)), (axis_y, (60, 180, 60)), (axis_z, (220, 120, 60))]:
+                asx, asy, _, aval = project_points(ax_pts)
+                if aval[0] and aval[1]:
+                    cv2.line(frame, (asx[0], asy[0]), (asx[1], asy[1]), col, 2, lineType=cv2.LINE_AA)
+
+        # 2. Draw 3D Orbital Trails (projected in real time)
+        if camera["show_trails"] and len(trails_3d) > 2:
+            num_trail_snaps = len(trails_3d)
+            # Project all trail snapshots
+            for k in range(num_trail_snaps - 1):
+                p_k = trails_3d[k]
+                p_next = trails_3d[k + 1]
+                sx_k, sy_k, _, v_k = project_points(p_k)
+                sx_next, sy_next, _, v_next = project_points(p_next)
+
+                alpha_factor = (k + 1) / num_trail_snaps  # Newer segments are brighter
+                thickness = 1 if alpha_factor < 0.6 else 2
+
+                for i in range(1, N):
+                    if v_k[i] and v_next[i]:
+                        base_col = colors_bgr[i - 1]
+                        trail_col = (
+                            int(base_col[0] * alpha_factor * 0.75),
+                            int(base_col[1] * alpha_factor * 0.75),
+                            int(base_col[2] * alpha_factor * 0.75)
+                        )
+                        cv2.line(frame, (sx_k[i], sy_k[i]), (sx_next[i], sy_next[i]),
+                                 trail_col, thickness, lineType=cv2.LINE_AA)
+
+        # 3. Project current particle positions and depth-sort
+        psx, psy, pzc, pval = project_points(engine.pos)
+
+        # Sort particles far-to-near (Painter's Algorithm)
+        draw_indices = np.argsort(pzc)[::-1]
+
+        for i in draw_indices:
+            if not pval[i]:
+                continue
+            x_i, y_i = psx[i], psy[i]
+            if not (-50 <= x_i < width + 50 and -50 <= y_i < height + 50):
+                continue
+
+            if i == 0:
+                # Glowing Central Star
+                # 4-layer radial halo
+                cv2.circle(frame, (x_i, y_i), 32, (0, 60, 150), -1, lineType=cv2.LINE_AA)
+                cv2.circle(frame, (x_i, y_i), 20, (0, 130, 230), -1, lineType=cv2.LINE_AA)
+                cv2.circle(frame, (x_i, y_i), 11, (0, 220, 255), -1, lineType=cv2.LINE_AA)
+                cv2.circle(frame, (x_i, y_i), 5, (255, 255, 255), -1, lineType=cv2.LINE_AA)
+            else:
+                # Orbiting bodies: depth-dependent radius and specular highlight
+                depth_ratio = 2.7 / np.maximum(pzc[i], 0.5)
+                radius = int(np.clip(2.5 * depth_ratio, 2, 8))
+                col = colors_bgr[i - 1]
+
+                cv2.circle(frame, (x_i, y_i), radius, col, -1, lineType=cv2.LINE_AA)
+                if radius >= 3:
+                    cv2.circle(frame, (x_i, y_i), max(1, radius // 2), (255, 255, 255), -1, lineType=cv2.LINE_AA)
+
+        # 4. Heads-Up Display (HUD) overlay banner
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, 0), (width, 105), (10, 15, 25), -1)
+        cv2.rectangle(overlay, (0, height - 38), (width, height), (10, 15, 25), -1)
+        frame = cv2.addWeighted(overlay, 0.80, frame, 0.20, 0)
+
+        # Top Title & Active Solver with color coding
+        cv2.putText(frame, "COSMIC ACCELERATION: 3D REAL-TIME CUDA ENGINE",
+                    (20, 28), cv2.FONT_HERSHEY_DUPLEX, 0.75, (255, 255, 255), 1, cv2.LINE_AA)
+
+        solver_colors = {
+            "gpu_tiled": (240, 200, 50),     # Bright Cyan
+            "gpu_direct": (120, 240, 120),   # Bright Green
+            "cpu": (80, 80, 255),            # Warning Red
+            "barnes_hut": (240, 150, 240)    # Soft Purple
+        }
+        s_col = solver_colors.get(engine.solver_name, (240, 200, 50))
+        cv2.putText(frame, f"Active Solver: [{SOLVER_NAMES[engine.solver_name]}]",
+                    (20, 54), cv2.FONT_HERSHEY_SIMPLEX, 0.58, s_col, 2, cv2.LINE_AA)
+
+        status_str = "PAUSED" if engine.paused else "RUNNING"
+        telemetry = (
+            f"Status: {status_str} | Step: {engine.step_count} | Sim Time: {engine.sim_time:.2f}s | "
+            f"FPS: {engine.fps:.1f} | Latency: {engine.mean_step_ms:.2f} ms | Drift: {engine.energy_drift_pct:.4f}%"
+        )
+        cv2.putText(frame, telemetry, (20, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (210, 225, 240), 1, cv2.LINE_AA)
+
+        cam_str = (
+            f"Camera: Pitch {int(np.degrees(camera['pitch']))} deg | "
+            f"Yaw {int(np.degrees(camera['yaw']))} deg | Dist {camera['distance']:.1f}x | "
+            f"Auto-Orbit: {'ON' if camera['auto_rotate'] else 'OFF'} | Substeps: {engine.substeps}x"
+        )
+        cv2.putText(frame, cam_str, (20, 98), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (140, 160, 180), 1, cv2.LINE_AA)
+
+        # Bottom Controls banner
+        controls = "[Mouse Drag/Arrows] Orbit 3D | [Scroll/W-S] Zoom | [C] Hot-Swap Solver | [Space] Pause | [V] Auto-Spin | [Q] Quit"
+        cv2.putText(frame, controls, (20, height - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (170, 180, 195), 1, cv2.LINE_AA)
+
+        cv2.imshow(window_name, frame)
+
+        # Key handling
+        key = cv2.waitKey(1) & 0xFF
+        if key in [ord('q'), ord('Q'), 27]:  # 27 is ESC
+            break
+        elif key == ord(' '):
+            engine.paused = not engine.paused
+        elif key in [ord('c'), ord('C')]:
+            engine.cycle_solver()
+        elif key in [ord('v'), ord('V')]:
+            camera["auto_rotate"] = not camera["auto_rotate"]
+        elif key in [ord('t'), ord('T')]:
+            camera["show_trails"] = not camera["show_trails"]
+        elif key in [ord('g'), ord('G')]:
+            camera["show_grid"] = not camera["show_grid"]
+        elif key in [ord('r'), ord('R')]:
+            engine.reset()
+            trails_3d.clear()
+            trails_3d.append(engine.pos.copy())
+        elif key in [ord('a'), ord('A')]:
+            engine.adaptive = not engine.adaptive
+        elif key in [ord('w'), ord('W')]:
+            camera["distance"] = max(1.0, camera["distance"] - 0.15)
+        elif key in [ord('s'), ord('S')]:
+            camera["distance"] = min(8.0, camera["distance"] + 0.15)
+        elif key in [ord('+'), ord('=')]:
+            engine.substeps = min(engine.substeps * 2, 16)
+        elif key in [ord('-'), ord('_')]:
+            engine.substeps = max(engine.substeps // 2, 1)
+
+    cv2.destroyAllWindows()
+
+
+# =============================================================================
+# GUI 3: HIGH-FPS 2D TOP-DOWN VIEW
 # =============================================================================
 def run_live_opencv(engine: LiveSimulationEngine):
-    """
-    High-performance 60-120 FPS hardware-accelerated OpenCV renderer.
-    Features glowing blooming star, neon plasma particles, alpha fading trails,
-    and a real-time HUD with telemetry.
-    """
+    """2D Top-down high-refresh-rate glowing view."""
     import cv2
     import matplotlib.cm as cm
 
@@ -468,25 +748,28 @@ def run_live_opencv(engine: LiveSimulationEngine):
 
 def main():
     parser = argparse.ArgumentParser(description="Cosmic Acceleration: Live Interactive N-Body Simulation")
-    parser.add_argument("--gui", choices=["3d", "2d", "fast"], default="3d",
-                        help="GUI frontend: '3d' (Matplotlib TkAgg with 3D rotation) or '2d'/'fast' (OpenCV high FPS)")
+    parser.add_argument("--gui", choices=["3d", "mpl", "2d", "fast"], default="3d",
+                        help="GUI frontend: '3d' (True 3D 60FPS perspective with mouse drag), 'mpl' (Matplotlib TkAgg), '2d'/'fast' (OpenCV 2D top-down)")
     parser.add_argument("--solver", choices=SOLVER_CHOICES, default="gpu_tiled",
-                        help="Initial acceleration compute engine")
+                        help="Initial acceleration compute engine (default: gpu_tiled)")
     parser.add_argument("--particles", type=int, default=150, help="Number of bodies (default: 150)")
     parser.add_argument("--adaptive", action="store_true", help="Start with adaptive time-stepping enabled")
     parser.add_argument("--substeps", type=int, default=1, help="Physics steps per render frame")
     args = parser.parse_args()
 
     config = SimulationConfig(num_bodies=args.particles)
+    is_3d_mode = args.gui in ["3d", "mpl"]
     engine = LiveSimulationEngine(
         config=config,
         solver_name=args.solver,
-        is_3d=(args.gui == "3d"),
+        is_3d=is_3d_mode,
         adaptive=args.adaptive
     )
     engine.substeps = args.substeps
 
     if args.gui == "3d":
+        run_live_3d_opencv(engine)
+    elif args.gui == "mpl":
         run_live_3d(engine)
     else:
         run_live_opencv(engine)

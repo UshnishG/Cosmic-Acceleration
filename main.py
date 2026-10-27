@@ -85,7 +85,9 @@ def run_2d_simulation(config: SimulationConfig, steps: int = 500, output_dir: st
 def main():
     parser = argparse.ArgumentParser(description="Cosmic Acceleration: A CUDA-Powered N-Body Simulation")
     parser.add_argument("--mode", choices=["3d", "2d", "all", "benchmark", "test", "live", "live-3d", "live-2d"], default="all",
-                        help="Execution mode (default: all). Use 'live' or 'live-3d' for interactive 3D GUI, 'live-2d' for 60FPS OpenCV.")
+                        help="Execution mode (default: all). Use 'live' or 'live-3d' for 60FPS 3D perspective GUI, 'live-2d' for top-down.")
+    parser.add_argument("--gui", choices=["3d", "mpl", "2d"], default="3d",
+                        help="GUI engine: '3d' (60FPS OpenCV 3D perspective with mouse drag), 'mpl' (Matplotlib TkAgg), '2d' (OpenCV top-down)")
     parser.add_argument("--solver", choices=["gpu_tiled", "gpu_direct", "cpu", "barnes_hut"], default="gpu_tiled",
                         help="Compute engine for live mode (default: gpu_tiled)")
     parser.add_argument("--steps", type=int, default=1000, help="Number of integration steps")
@@ -105,7 +107,7 @@ def main():
         benchmark_solvers()
         generate_benchmark_charts()
     elif args.mode in ["live", "live-3d"]:
-        from src.live_simulation import LiveSimulationEngine, run_live_3d
+        from src.live_simulation import LiveSimulationEngine, run_live_3d_opencv, run_live_3d
         engine = LiveSimulationEngine(
             config=config,
             solver_name=args.solver,
@@ -113,7 +115,10 @@ def main():
             adaptive=args.adaptive
         )
         engine.substeps = args.substeps
-        run_live_3d(engine)
+        if args.gui == "mpl":
+            run_live_3d(engine)
+        else:
+            run_live_3d_opencv(engine)
     elif args.mode == "live-2d":
         from src.live_simulation import LiveSimulationEngine, run_live_opencv
         engine = LiveSimulationEngine(
