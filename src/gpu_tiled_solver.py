@@ -164,6 +164,8 @@ class GPUTiledNBodySolver:
             (threads,),
             (pos, self.d_mass, out_acc, cp.int32(self.N), cp.float64(self.G), cp.float64(self.softening_sq))
         )
+        if self.config.moving_center:
+            out_acc -= (self.config.central_omega ** 2) * pos
 
     def _compute_accel_torch(self, pos: "torch.Tensor") -> "torch.Tensor":
         N = pos.size(0)
@@ -185,6 +187,8 @@ class GPUTiledNBodySolver:
             weights = (self.G * tile_mass.unsqueeze(0)) * inv_dist_cubed
             accel += torch.sum(weights.unsqueeze(-1) * diff, dim=1)
             
+        if self.config.moving_center:
+            accel = accel - (self.config.central_omega ** 2) * pos
         return accel
 
     def compute_acceleration(self, pos_np: np.ndarray) -> np.ndarray:

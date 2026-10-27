@@ -92,11 +92,12 @@ def main():
                         help="Compute engine for live mode (default: gpu_tiled)")
     parser.add_argument("--steps", type=int, default=1000, help="Number of integration steps")
     parser.add_argument("--adaptive", action="store_true", help="Enable adaptive time-stepping in live mode")
+    parser.add_argument("--moving-center", action="store_true", help="Enable moving central body orbit (central star orbits in 3D)")
     parser.add_argument("--substeps", type=int, default=1, help="Physics steps per render frame in live mode")
     parser.add_argument("--outdir", type=str, default="output", help="Directory for output plots")
     args = parser.parse_args()
     
-    config = SimulationConfig()
+    config = SimulationConfig(moving_center=args.moving_center)
     
     if args.mode == "test":
         import subprocess
@@ -112,7 +113,8 @@ def main():
             config=config,
             solver_name=args.solver,
             is_3d=True,
-            adaptive=args.adaptive
+            adaptive=args.adaptive,
+            moving_center=args.moving_center
         )
         engine.substeps = args.substeps
         if args.gui == "mpl":
@@ -125,7 +127,8 @@ def main():
             config=config,
             solver_name=args.solver,
             is_3d=False,
-            adaptive=args.adaptive
+            adaptive=args.adaptive,
+            moving_center=args.moving_center
         )
         engine.substeps = args.substeps
         run_live_opencv(engine)

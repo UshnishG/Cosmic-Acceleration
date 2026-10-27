@@ -38,9 +38,12 @@ class LiveSimulationEngine:
         solver_name: str = "gpu_tiled",
         is_3d: bool = True,
         adaptive: bool = False,
-        seed: int = 42
+        seed: int = 42,
+        moving_center: bool = False
     ):
         self.config = config
+        if moving_center:
+            self.config.moving_center = True
         self.is_3d = is_3d
         self.adaptive = adaptive
         self.seed = seed
@@ -60,7 +63,7 @@ class LiveSimulationEngine:
     def reset(self):
         """Re-initializes particles to stable inclined Keplerian disk."""
         self.pos, self.vel, self.mass = generate_keplerian_disk(
-            self.config, is_3d=self.is_3d, seed=self.seed
+            self.config, is_3d=self.is_3d, seed=self.seed, moving_center=self.config.moving_center
         )
         self.N = len(self.mass)
         self.sim_time = 0.0
@@ -75,6 +78,13 @@ class LiveSimulationEngine:
         
         # Initialize solver
         self._init_solver(self.solver_name)
+
+    def toggle_moving_center(self):
+        """Toggles between moving central body orbit and stationary center."""
+        self.config.moving_center = not self.config.moving_center
+        status = "ORBITING (R=0.25, omega=1.2)" if self.config.moving_center else "STATIONARY (At Origin)"
+        print(f"\n[ORBIT MODE] Central Body Orbit: {status}")
+        self.reset()
 
     def _init_solver(self, name: str):
         self.solver_name = name
@@ -262,6 +272,10 @@ def run_live_3d(engine: LiveSimulationEngine, trail_len: int = 40):
             hud_solver.set_text(f"Solver: {SOLVER_NAMES[engine.solver_name]}")
         elif event.key in ['r', 'R']:
             engine.reset()
+            trails.clear()
+            trails.append(engine.pos.copy())
+        elif event.key in ['m', 'M']:
+            engine.toggle_moving_center()
             trails.clear()
             trails.append(engine.pos.copy())
         elif event.key in ['a', 'A']:
@@ -512,16 +526,28 @@ def run_live_3d_opencv(engine: LiveSimulationEngine):
                 alpha_factor = (k + 1) / num_trail_snaps  # Newer segments are brighter
                 thickness = 1 if alpha_factor < 0.6 else 2
 
-                for i in range(1, N):
+                for i in range(0, N):
                     if v_k[i] and v_next[i]:
-                        base_col = colors_bgr[i - 1]
-                        trail_col = (
-                            int(base_col[0] * alpha_factor * 0.75),
-                            int(base_col[1] * alpha_factor * 0.75),
-                            int(base_col[2] * alpha_factor * 0.75)
-                        )
-                        cv2.line(frame, (sx_k[i], sy_k[i]), (sx_next[i], sy_next[i]),
-                                 trail_col, thickness, lineType=cv2.LINE_AA)
+                        if i == 0:
+                            # Glowing Golden Trail for the Moving Central Star!
+                            trail_col = (
+                                int(20 * alpha_factor),
+                                int(190 * alpha_factor),
+                                int(255 * alpha_factor)
+                            )
+                            t_thick = max(2, int(3 * alpha_factor))
+                            cv2.line(frame, (sx_k[i], sy_k[i]), (sx_next[i], sy_next[i]),
+                                     trail_col, t_thick, lineType=cv2.LINE_AA)
+                        else:
+                            base_col = colors_bgr[i - 1]
+                            trail_col = (
+                                int(base_col[0] * alpha_factor * 0.75),
+                                int(base_col[1] * alpha_factor * 0.75),
+                                int(base_col[2] * alpha_factor * 0.75)
+                            )
+                            thickness = 1 if alpha_factor < 0.6 else 2
+                            cv2.line(frame, (sx_k[i], sy_k[i]), (sx_next[i], sy_next[i]),
+                                     trail_col, thickness, lineType=cv2.LINE_AA)
 
         # 3. Project current particle positions and depth-sort
         psx, psy, pzc, pval = project_points(engine.pos)
@@ -580,16 +606,17 @@ def run_live_3d_opencv(engine: LiveSimulationEngine):
         )
         cv2.putText(frame, telemetry, (20, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (210, 225, 240), 1, cv2.LINE_AA)
 
+        m_status = "ORBITING (3D)" if engine.config.moving_center else "STATIONARY"
         cam_str = (
             f"Camera: Pitch {int(np.degrees(camera['pitch']))} deg | "
             f"Yaw {int(np.degrees(camera['yaw']))} deg | Dist {camera['distance']:.1f}x | "
-            f"Auto-Orbit: {'ON' if camera['auto_rotate'] else 'OFF'} | Substeps: {engine.substeps}x"
+            f"Central Star: {m_status} | Substeps: {engine.substeps}x"
         )
         cv2.putText(frame, cam_str, (20, 98), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (140, 160, 180), 1, cv2.LINE_AA)
 
         # Bottom Controls banner
-        controls = "[Mouse Drag/Arrows] Orbit 3D | [Scroll/W-S] Zoom | [C] Hot-Swap Solver | [Space] Pause | [V] Auto-Spin | [Q] Quit"
-        cv2.putText(frame, controls, (20, height - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (170, 180, 195), 1, cv2.LINE_AA)
+        controls = "[Mouse Drag] Orbit 3D | [W-S] Zoom | [C] Hot-Swap Solver | [M] Toggle Star Orbit | [Space] Pause | [Q] Quit"
+        cv2.putText(frame, controls, (20, height - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.43, (170, 180, 195), 1, cv2.LINE_AA)
 
         cv2.imshow(window_name, frame)
 
@@ -601,6 +628,10 @@ def run_live_3d_opencv(engine: LiveSimulationEngine):
             engine.paused = not engine.paused
         elif key in [ord('c'), ord('C')]:
             engine.cycle_solver()
+        elif key in [ord('m'), ord('M')]:
+            engine.toggle_moving_center()
+            trails_3d.clear()
+            trails_3d.append(engine.pos.copy())
         elif key in [ord('v'), ord('V')]:
             camera["auto_rotate"] = not camera["auto_rotate"]
         elif key in [ord('t'), ord('T')]:
@@ -674,12 +705,16 @@ def run_live_opencv(engine: LiveSimulationEngine):
         coords_x = (cx + engine.pos[:, 0] * scale).astype(int)
         coords_y = (cy - engine.pos[:, 1] * scale).astype(int)
 
-        # Draw orbiters on trail canvas
-        for i in range(1, N):
+        # Draw orbiters and moving central star on trail canvas
+        start_idx = 0 if engine.config.moving_center else 1
+        for i in range(start_idx, N):
             px, py = coords_x[i], coords_y[i]
             if 0 <= px < width and 0 <= py < height:
-                col = colors_bgr[i - 1]
-                cv2.circle(trail_canvas, (px, py), 2, col, -1, lineType=cv2.LINE_AA)
+                if i == 0:
+                    cv2.circle(trail_canvas, (px, py), 4, (0, 200, 255), -1, lineType=cv2.LINE_AA)
+                else:
+                    col = colors_bgr[i - 1]
+                    cv2.circle(trail_canvas, (px, py), 2, col, -1, lineType=cv2.LINE_AA)
 
         # Compose frame
         frame = trail_canvas.copy()
@@ -721,7 +756,7 @@ def run_live_opencv(engine: LiveSimulationEngine):
         )
         cv2.putText(frame, telemetry, (20, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (200, 220, 240), 1, cv2.LINE_AA)
 
-        controls_str = "[Space] Pause | [C] Cycle Solver | [R] Reset | [A] Adaptive Δt | [+/-] Speed | [Q] Quit"
+        controls_str = "[Space] Pause | [C] Cycle Solver | [M] Toggle Star Orbit | [R] Reset | [Q] Quit"
         cv2.putText(frame, controls_str, (20, height - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (160, 170, 180), 1, cv2.LINE_AA)
 
         cv2.imshow(window_name, frame)
@@ -733,6 +768,9 @@ def run_live_opencv(engine: LiveSimulationEngine):
             engine.paused = not engine.paused
         elif key in [ord('c'), ord('C')]:
             engine.cycle_solver()
+        elif key in [ord('m'), ord('M')]:
+            engine.toggle_moving_center()
+            trail_canvas = np.zeros((height, width, 3), dtype=np.uint8)
         elif key in [ord('r'), ord('R')]:
             engine.reset()
             trail_canvas = np.zeros((height, width, 3), dtype=np.uint8)

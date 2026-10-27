@@ -89,6 +89,8 @@ class GPUNBodyDirectSolver:
         
         weights = (self.G * self.d_mass.unsqueeze(0)) * inv_dist_cubed  # (N, N)
         accel = torch.sum(weights.unsqueeze(-1) * diff, dim=1)  # (N, 3)
+        if self.config.moving_center:
+            accel = accel - (self.config.central_omega ** 2) * pos
         return accel
 
     def _compute_accel_cupy(self, pos: "cp.ndarray") -> "cp.ndarray":
@@ -100,6 +102,8 @@ class GPUNBodyDirectSolver:
         
         weights = (self.G * self.d_mass[None, :]) * inv_dist_cubed
         accel = cp.sum(weights[:, :, None] * diff, axis=1)
+        if self.config.moving_center:
+            accel = accel - (self.config.central_omega ** 2) * pos
         return accel
 
     def compute_acceleration(self, pos_np: np.ndarray) -> np.ndarray:

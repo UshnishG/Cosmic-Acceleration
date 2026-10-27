@@ -10,10 +10,17 @@ from src.constants import SimulationConfig
 def generate_keplerian_disk(
     config: SimulationConfig = None,
     is_3d: bool = True,
-    seed: int = 42
+    seed: int = 42,
+    moving_center: bool = False
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate initial positions, velocities, and masses.
+    
+    Args:
+        config: SimulationConfig instance
+        is_3d: Whether to generate 3D inclined disk or flat 2D disk
+        seed: Random seed for reproducibility
+        moving_center: If True, the central body executes its own 3D orbit around the origin
     
     Returns:
         pos: (N, 3) float64 array of positions [x, y, z]
@@ -32,11 +39,48 @@ def generate_keplerian_disk(
     
     # Body 0 is the heavy central body
     mass[0] = config.central_mass
+    num_orbiters = N - 1
+
+    is_moving = moving_center or config.moving_center
+    if is_moving:
+        r0 = config.central_orbit_radius
+        omega0 = config.central_omega
+        z0 = config.central_orbit_tilt if is_3d else 0.0
+        v0 = omega0 * r0
+        
+        pos[0] = [r0, 0.0, z0]
+        vel[0] = [0.0, v0, 0.0]
+        
+        # Radii relative to moving center: [0.15, 0.65]
+        rel_radii = rng.uniform(0.15, 0.65, size=num_orbiters)
+        angles = rng.uniform(0.0, 2.0 * np.pi, size=num_orbiters)
+        r_eff = np.sqrt(rel_radii**2 + config.softening**2)
+        v_circ = np.sqrt(config.G * config.central_mass * rel_radii / (r_eff**1.5))
+        
+        if is_3d:
+            inc = rng.uniform(-config.z_tilt_max, config.z_tilt_max, size=num_orbiters)
+            pos[1:, 0] = pos[0, 0] + rel_radii * np.cos(angles)
+            pos[1:, 1] = pos[0, 1] + rel_radii * np.sin(angles)
+            pos[1:, 2] = pos[0, 2] + inc
+            
+            vel[1:, 0] = vel[0, 0] - v_circ * np.sin(angles)
+            vel[1:, 1] = vel[0, 1] + v_circ * np.cos(angles)
+            vel[1:, 2] = rng.uniform(-0.02, 0.02, size=num_orbiters)
+        else:
+            pos[1:, 0] = pos[0, 0] + rel_radii * np.cos(angles)
+            pos[1:, 1] = pos[0, 1] + rel_radii * np.sin(angles)
+            pos[1:, 2] = 0.0
+            
+            vel[1:, 0] = vel[0, 0] - v_circ * np.sin(angles)
+            vel[1:, 1] = vel[0, 1] + v_circ * np.cos(angles)
+            vel[1:, 2] = 0.0
+            
+        return pos, vel, mass
+    
     pos[0] = [0.0, 0.0, 0.0]
     vel[0] = [0.0, 0.0, 0.0]
     
     # Orbiters: 1 to N-1
-    num_orbiters = N - 1
     # Distribute radii in range [r_min, r_max]
     radii = rng.uniform(config.r_min, config.r_max, size=num_orbiters)
     angles = rng.uniform(0.0, 2.0 * np.pi, size=num_orbiters)

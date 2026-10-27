@@ -171,7 +171,10 @@ class BarnesHutSolver:
 
     def compute_acceleration(self, pos: np.ndarray) -> np.ndarray:
         tree = BarnesHutTree(pos, self.mass, theta=self.theta)
-        return tree.compute_accelerations(self.G, self.softening)
+        accels = tree.compute_accelerations(self.G, self.softening)
+        if self.config.moving_center:
+            accels -= (self.config.central_omega ** 2) * pos
+        return accels
 
     def step(self, dt: float) -> float:
         self.pos, self.vel, self.acc = velocity_verlet_step(

@@ -32,3 +32,9 @@ class SimulationConfig:
     # Barnes-Hut & Monte Carlo
     theta: float = 0.5                 # Barnes-Hut opening threshold (multipole acceptance criterion)
     mc_sample_ratio: float = 0.15      # Fraction of particles for Monte Carlo control-variate sampling
+    
+    # Moving Central Body Orbit Configuration
+    moving_center: bool = False        # If True, central heavy body moves in its own stable 3D orbit
+    central_orbit_radius: float = 0.25 # Radius of central body's orbit around system barycenter
+    central_omega: float = 1.20        # Angular velocity of central body's orbit
+    central_orbit_tilt: float = 0.02   # 3D inclination tilt of central body's orbit

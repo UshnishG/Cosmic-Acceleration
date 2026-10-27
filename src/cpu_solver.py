@@ -49,6 +49,8 @@ class CPUNBodySolver:
         
         # a_i = sum_j weights[i, j] * diff[i, j, :]
         accel = np.sum(weights[:, :, None] * diff, axis=1)  # shape: (N, 3)
+        if self.config.moving_center:
+            accel -= (self.config.central_omega ** 2) * pos
         return accel
 
     def step(self, dt: float) -> float:
